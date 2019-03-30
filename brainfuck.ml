@@ -120,19 +120,33 @@ let rec execute_program (prog: program) (state: program_state): program_state =
   | true -> state
   | false -> execute_program prog (advance_statement_index (execute_current_instruction prog state))
 
-let main () = 
-  let program_state = get_initial_program_state in
-    let program_example = [
-      IncByte;IncByte;IncByte;IncByte;IncByte;IncByte;IncByte;IncByte;JmpForward;IncDataPointer;
-      IncByte;IncByte;IncByte;IncByte;JmpForward;IncDataPointer;IncByte;IncByte;IncDataPointer;IncByte;IncByte;IncByte;IncDataPointer;
-      IncByte;IncByte;IncByte;IncDataPointer;IncByte;DecDataPointer;DecDataPointer;DecDataPointer;DecDataPointer;DecByte;JmpBackward;
-      IncDataPointer;IncByte;IncDataPointer;IncByte;IncDataPointer;DecByte;IncDataPointer;IncDataPointer;IncByte;JmpForward;DecDataPointer;
-      JmpBackward;DecDataPointer;DecByte;JmpBackward;IncDataPointer;IncDataPointer;OutByte;IncDataPointer;DecByte;DecByte;DecByte;OutByte;
-      IncByte;IncByte;IncByte;IncByte;IncByte;IncByte;IncByte;OutByte;OutByte;IncByte;IncByte;IncByte;OutByte;IncDataPointer;IncDataPointer;
-      OutByte;DecDataPointer;DecByte;OutByte;DecDataPointer;OutByte;IncByte;IncByte;IncByte;OutByte;DecByte;DecByte;DecByte;DecByte;DecByte;DecByte;
-      OutByte;DecByte;DecByte;DecByte;DecByte;DecByte;DecByte;DecByte;DecByte;OutByte;IncDataPointer;IncDataPointer;IncByte;OutByte;
-      IncDataPointer;IncByte;IncByte;OutByte;
-    ] in 
-      execute_program program_example program_state;;
+let rec read_program_from_stream (stream: in_channel): program = 
+  let rec fill_list acc =
+    try
+      let character = input_char stream in 
+        match character with
+        | '>' -> fill_list (IncDataPointer::acc)
+        | '<' -> fill_list (DecDataPointer::acc)
+        | '+' -> fill_list (IncByte::acc)
+        | '-' -> fill_list (DecByte::acc)
+        | '.' -> fill_list (OutByte::acc)
+        | ',' -> fill_list (AccByte::acc)
+        | '[' -> fill_list (JmpForward::acc)
+        | ']' -> fill_list (JmpBackward::acc)
+        | _ -> fill_list acc
+    with End_of_file -> List.rev acc
+  in fill_list []
 
-let final_state = main()
+let read_program_from_file (filename: string) : program = 
+  let stream = open_in filename in
+    read_program_from_stream stream;;
+
+let main ():unit = 
+  if Array.length Sys.argv = 2 then
+    let program_file = Sys.argv.(1) in 
+      let program_state = get_initial_program_state in
+        let program_example = read_program_from_file program_file in
+          ignore((execute_program program_example program_state))
+  else print_endline "Usage: brainfuck filename.bf";;
+
+main()
